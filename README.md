@@ -5,6 +5,14 @@ assessment categories, validation, JSON/CSV export and Print / PDF remain.
 The inherited mixed-language working risk summaries are preserved verbatim;
 they are not approved official BSI wording. All new interface text is English.
 
+## Organiser reporting extension
+
+See [ORGANISER-MODULE.md](ORGANISER-MODULE.md) for the integrated club/show dashboard,
+CSV/Excel ring import, access management, status exports and additive migration.
+Apply organiser-schema.sql to the same D1 database before deploying this version.
+New submissions require organising club type, regional ID or free-text club name,
+and ring number; existing stored report content is retained.
+
 ## What works on GitHub Pages
 
 - Complete draft report PDF download, generated locally in the browser.

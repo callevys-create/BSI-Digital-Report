@@ -11,9 +11,9 @@ import {processOutbox} from './delivery.mjs';
 import {VERSION,statistics,csv} from './statistics.mjs';
 import {reportPDF,excelBytes,statisticsPDF} from './exports.mjs';
 import breeds from './breeds.json' with {type:'json'};
-const schema=await readFile(new URL('./schema.sql',import.meta.url),'utf8');
+const schema=await readFile(new URL('./schema.sql',import.meta.url),'utf8')+await readFile(new URL('./organiser-schema.sql',import.meta.url),'utf8');
 const font=await readFile(new URL('./NotoSans-Regular.ttf',import.meta.url));
-const report=(b=breeds[4],year=2026)=>({schema:'bsi-prototype-2',source:'Test working summaries',bsiVersion:VERSION,show:'Example Show',date:`${year}-06-01`,judge:'Synthetic Judge Åsa',country:'Sweden',breed:b.name,group:b.group,total:10,risks:b.risks.map(risk=>({risk,none:5,mild:2,clear:1,severe:1,na:1})),other:[{problem:'Test other concern',count:1}],positive:'Comfortable movement',quality:2,placing:1,comments:'Complete comments'});
+const report=(b=breeds[4],year=2026)=>({schema:'bsi-prototype-3',organisingClub:{type:'regional',id:'stockholm'},ring:'1',source:'Test working summaries',bsiVersion:VERSION,show:'Example Show',date:`${year}-06-01`,judge:'Synthetic Judge Åsa',country:'Sweden',breed:b.name,group:b.group,total:10,risks:b.risks.map(risk=>({risk,none:5,mild:2,clear:1,severe:1,na:1})),other:[{problem:'Test other concern',count:1}],positive:'Comfortable movement',quality:2,placing:1,comments:'Complete comments'});
 const body=()=>({report:report(),sendCopy:true,email:'judge@example.org',submissionKey:crypto.randomUUID().replaceAll('-',''),receiptKey:crypto.randomUUID().replaceAll('-',''),token:'test'});
 function database(){
  const db=new DatabaseSync(':memory:');db.exec(schema);

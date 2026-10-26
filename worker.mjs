@@ -1,3 +1,6 @@
+import {organiserPrincipal} from './auth.mjs';
+import {organiserAPI} from './organiser-api.mjs';
+import {clubFor} from './clubs.mjs';
 import { Webhook } from 'svix';
 import {validate,emailValid,keyValid,readJSON,readText,hash} from './validation.mjs';
 import {saveSubmission,receiptReport,loadStatisticsReports} from './storage.mjs';
@@ -67,6 +70,18 @@ async function route(request,env,ctx) {
  const url=new URL(request.url),path=url.pathname;
  if(path==='/health')return json({prototype:true,onlineSubmissionConfigured:Boolean(env.DB&&env.PDFS&&env.TURNSTILE_SECRET&&env.RESEND_API_KEY&&env.MAIL_FROM),bsiVersion:VERSION});
  if(path==='/webhooks/resend'&&request.method==='POST')return webhook(request,env);
+ if(path==='/public/shows'&&request.method==='GET'){
+  const club=url.searchParams.get('club'),date=url.searchParams.get('date');
+  if(!clubFor(club)||!validDate(date))failure('A regional club and date are required.',400);
+  return json((await env.DB.prepare('SELECT id,name,date,country FROM organiser_shows WHERE club_id=? AND date=? ORDER BY name LIMIT 100').bind(club,date).all()).results);
+ }
+ if(path.startsWith('/api/organiser/') || path==='/organiser' || path==='/organiser.html'){
+  const user=await organiserPrincipal(request,env);
+  if(path.startsWith('/api/organiser/'))return organiserAPI(request,env,url,user);
+  const asset=await env.ASSETS.fetch(new Request(new URL('/organiser.html',request.url)));
+  const h=new Headers(asset.headers);h.set('Cache-Control','no-store');h.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'");return new Response(asset.body,{status:asset.status,headers:h});
+ }
+
  if(path.startsWith('/api/admin/') || path==='/admin' || path==='/admin.html') {
   const user=await administrator(request,env);
   if(path.startsWith('/api/admin/'))return adminAPI(request,env,url,user);
@@ -96,7 +111,7 @@ async function route(request,env,ctx) {
   return json({submitted:true,id:saved.id,duplicate:saved.duplicate,distribution:'queued'},saved.duplicate?200:201);
  }
  // Only explicitly public assets can be served. Never expose private storage through assets.
- if(['/admin.js','/admin.css','/statistics.mjs','/exports-client.js','/NotoSans-Regular.ttf','/breeds.json'].includes(path))return env.ASSETS.fetch(request);
+ if(['/organiser.js','/organiser-client.js','/regional-clubs.json','/admin.js','/admin.css','/statistics.mjs','/exports-client.js','/NotoSans-Regular.ttf','/breeds.json'].includes(path))return env.ASSETS.fetch(request);
  failure('Not found',404);
 }
 export default {
@@ -104,7 +119,7 @@ export default {
   let response;try{response=await route(request,env,ctx);}catch(error){response=json({error:error.status?error.message:'Service temporarily unavailable. The report may already have been saved.'},error.status||503);}
   const h=new Headers(response.headers);h.set('X-Content-Type-Options','nosniff');h.set('Referrer-Policy','no-referrer');
   const path=new URL(request.url).pathname;
-  if((path==='/reports'||path.startsWith('/receipts/'))&&request.headers.get('Origin')===env.ALLOWED_ORIGIN){h.set('Access-Control-Allow-Origin',env.ALLOWED_ORIGIN);h.set('Vary','Origin');h.set('Access-Control-Allow-Methods','GET, POST, OPTIONS');h.set('Access-Control-Allow-Headers','Content-Type, Authorization');}
+  if((path==='/reports'||path==='/public/shows'||path.startsWith('/receipts/'))&&request.headers.get('Origin')===env.ALLOWED_ORIGIN){h.set('Access-Control-Allow-Origin',env.ALLOWED_ORIGIN);h.set('Vary','Origin');h.set('Access-Control-Allow-Methods','GET, POST, OPTIONS');h.set('Access-Control-Allow-Headers','Content-Type, Authorization');}
   if(path.startsWith('/receipts/')&&request.method==='OPTIONS'&&request.headers.get('Origin')===env.ALLOWED_ORIGIN)return new Response(null,{status:204,headers:h});
   return new Response(response.body,{status:response.status,headers:h});
  },

@@ -6,7 +6,10 @@ const xml=s=>String(s??'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'
 const col=n=>{let s='';for(n++;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;};
 // Small, standards-based OOXML writer. All user text is stored as text, never formulas.
 export function excelBytes(stats) {
- const tables=statisticTables(stats), files={};
+ return workbookBytes(statisticTables(stats));
+}
+export function workbookBytes(tables) {
+ const files={};
  const put=(path,s)=>files[path]=strToU8(s);
  put('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${tables.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`);
  put('_rels/.rels','<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
@@ -67,7 +70,7 @@ export async function textPDF(title, sections, fontBytes) {
 }
 export function reportSections(p,id='Draft') {
  return [
-  {title:'Report identification',lines:[`Report ID: ${id}`,`BSI version: ${p.bsiVersion||'Legacy / not recorded'}`,`Show: ${p.show}`,`Date: ${p.date} | Country: ${p.country}`,`Judge: ${p.judge}`,`Breed: ${p.breed} | ${p.group}`,`Dogs judged: ${p.total} (judging observations, not unique dogs)`]},
+  {title:'Report identification',lines:[`Report ID: ${id}`,`BSI version: ${p.bsiVersion||'Legacy / not recorded'}`,`Organising club: ${p.organisingClub?.name||'Not recorded (historical report)'}`,`Club type: ${p.organisingClub?.type||'Not recorded'} | Ring: ${p.ring||'Not recorded'}`,`Show: ${p.show}`,`Date: ${p.date} | Country: ${p.country}`,`Judge: ${p.judge}`,`Breed: ${p.breed} | ${p.group}`,`Dogs judged: ${p.total} (judging observations, not unique dogs)`]},
   ...p.risks.map(r=>({title:r.risk,lines:[`No observed concerns: ${r.none} | Mild: ${r.mild} | Clear: ${r.clear}`,`Severe: ${r.severe} | Not assessed: ${r.na}`]})),
   {title:'Other observed concerns',lines:p.other.length?p.other.map(o=>`${o.problem} | Number affected: ${o.count}`):['None recorded']},
   {title:'Positive observations',lines:[p.positive||'None recorded']},

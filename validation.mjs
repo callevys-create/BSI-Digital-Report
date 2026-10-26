@@ -1,9 +1,11 @@
+import {validOrganiser,clubFor} from './clubs.mjs';
 import breeds from './breeds.json' with {type:'json'};
 import { validDate, VERSION } from './statistics.mjs';
 export const emailValid=s=>typeof s==='string' && s.length<=254 && /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/.test(s);
 export const keyValid=s=>typeof s==='string' && /^[A-Za-z0-9_-]{32,100}$/.test(s);
 export function validate(body) {
  const p=body?.report;
+ if(!validOrganiser(p))return false;
  const str=(s,max=4000)=>typeof s==='string'&&s.length<=max;
  if(!p || !Number.isInteger(p.total)||p.total<1||p.total>100000 || p.bsiVersion!==VERSION) return false;
  const count=n=>Number.isInteger(n)&&n>=0&&n<=p.total;
@@ -17,7 +19,9 @@ export function validate(body) {
 }
 // Whitelist the saved fields: no injected destinations, status, or hidden metadata.
 export function canonicalReport(p) {
- return Object.fromEntries(['schema','source','bsiVersion','show','date','judge','country','breed','group','total','risks','other','positive','quality','placing','comments'].map(k=>[k,p[k]??'']));
+ const result=Object.fromEntries(['schema','source','bsiVersion','show','date','judge','country','breed','group','total','risks','other','positive','quality','placing','comments','ring','showId'].map(k=>[k,p[k]??'']));
+ result.organisingClub=p.organisingClub.type==='regional'?{type:'regional',...clubFor(p.organisingClub.id)}:{type:'speciality',name:p.organisingClub.name.trim()};
+ return result;
 }
 export async function hash(text){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 export async function readText(request,limit=65536) {
