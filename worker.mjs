@@ -23,7 +23,7 @@ async function adminAPI(request,env,url,user) {
   if(request.method==='GET')return json((await env.DB.prepare('SELECT id,email,active FROM recipients ORDER BY email').all()).results);
   if(request.method==='POST'){
    const b=await readJSON(request,2048);if(!emailValid(b.email))failure('A valid recipient email is required.',400);
-   const email=b.email.trim().toLowerCase(),id=b.id||crypto.randomUUID();if(b.id&&!keyValid(b.id.replaceAll('-','')))failure('Invalid recipient ID',400);
+   const email=b.email.trim().toLowerCase();const previous=await env.DB.prepare('SELECT id FROM recipients WHERE email=?').bind(email).first();if(b.id&&previous&&previous.id!==b.id)failure('This address is already assigned to another recipient.',409);const id=b.id||previous?.id||crypto.randomUUID();if(b.id&&!keyValid(b.id.replaceAll('-','')))failure('Invalid recipient ID',400);
    await env.DB.batch([
     env.DB.prepare('INSERT INTO recipients (id,email,active,updated_at) VALUES (?,?,1,?) ON CONFLICT(id) DO UPDATE SET email=excluded.email,active=1,updated_at=excluded.updated_at').bind(id,email,new Date().toISOString()),
     env.DB.prepare('INSERT INTO audit_log (id,actor,action,target,created_at) VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),user.email,'recipient_saved',id,new Date().toISOString())

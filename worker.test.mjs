@@ -98,6 +98,12 @@ test('Signed administrator sessions, analyst permissions, forged tokens and CSRF
  const h={'Cf-Access-Jwt-Assertion':await sign('manager@example.org'),'Content-Type':'application/json'};
  const req=origin=>new Request('https://backend.test/api/admin/recipients',{method:'POST',headers:{...h,Origin:origin},body:JSON.stringify({email:'new@example.org'})});
  assert.equal((await worker.fetch(req('https://attacker.test'),env)).status,403);assert.equal((await worker.fetch(req('https://backend.test'),env)).status,200);assert.equal(env.DB.raw.prepare('SELECT COUNT(*) n FROM audit_log').get().n,1);
+ const recipient=env.DB.raw.prepare("SELECT id FROM recipients WHERE email='new@example.org'").get();
+ const remove=()=>new Request('https://backend.test/api/admin/recipients/'+recipient.id,{method:'DELETE',headers:{...h,Origin:'https://backend.test'}});
+ assert.equal((await worker.fetch(remove(),env)).status,200);
+ assert.equal((await worker.fetch(req('https://backend.test'),env)).status,200);
+ assert.equal(env.DB.raw.prepare("SELECT active FROM recipients WHERE email='new@example.org'").get().active,1);
+ assert.equal(env.DB.raw.prepare("SELECT COUNT(*) n FROM recipients WHERE email='new@example.org'").get().n,1);
  }finally{globalThis.fetch=original;}
 });
 test('Generate real PDF and Excel fixtures from the same statistics engine',async()=>{

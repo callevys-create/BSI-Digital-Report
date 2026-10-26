@@ -103,7 +103,7 @@ async function deliveries(){const rows=await api('/api/admin/deliveries');table(
 async function history(){const rows=await api('/api/admin/audit');table('audit',['Administrator','Action','Target','Time'],rows.map(r=>[r.actor,r.action,r.target,r.created_at]));}
 $('refreshDeliveries').onclick=()=>deliveries().catch(e=>notice(e.message));
 try{
- const r=await fetch('./breeds.json');if(!r.ok)throw new Error('Breed list could not load.');breeds=await r.json();
+ const r=await fetch('./breeds.json');if(!r.ok)throw new Error('Breed list could not load.');breeds=await r.json();$('demo').disabled=false;
  for(const b of breeds){const o=document.createElement('option');o.value=b.name;o.textContent=b.name;$('breed').append(o);}
  // On GitHub Pages this is intentionally a public, synthetic-only preview.
  if(location.hostname.endsWith('.github.io'))throw new Error('Live administration is not connected here. Use the protected backend administration URL after setup, or load demonstration data.');
