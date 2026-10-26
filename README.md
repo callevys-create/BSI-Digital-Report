@@ -1,53 +1,130 @@
-# BSI Digital Report
+# BSI Digital Judge Report
 
-Working prototype, not an official FCI form. The existing 38 breed entries,
-unlisted-breed choice and working risk summaries are preserved.
+Existing judge interface preserved: all 38 BSI breed entries, unlisted breeds,
+assessment categories, validation, JSON/CSV export and Print / PDF remain.
+The inherited mixed-language working risk summaries are preserved verbatim;
+they are not approved official BSI wording. All new interface text is English.
 
-## Current status
+## What works on GitHub Pages
 
-GitHub Pages supports exports, optional judge email and an unchecked
-“Send me a copy of my completed BSI report” checkbox. Submission is disabled
-until `config.js` contains a backend URL, public Turnstile site key and privacy URL.
-No email is sent in this default state. Email is excluded from exports.
+- Complete draft report PDF download, generated locally in the browser.
+- Administration/statistics preview at `admin.html`: click **Load demonstration data**.
+  This is deliberately synthetic, not real SKK data.
+- Any date range and breed selection; annual totals and per-area counts and
+  percentages; missing assessments, sample sizes, descriptive annual changes.
+- PDF and real OOXML Excel (.xlsx) exports, area CSV and SVG trend chart download.
+- Optional judge email, unchecked consent and explicit disconnected-service state.
 
-## Activate real submission and email
+## Implemented backend (not connected by default)
 
-An administrator needs Cloudflare Workers/D1/Turnstile and a Resend account
-with a verified sending domain. Never commit secrets or enter them in config.js.
+- Server validation, Turnstile, rate limiting, size bounds and strict origins.
+- D1 transaction saves an immutable report snapshot, structured risk assessments
+  and one durable outbox entry per recipient. Requires an active SKK recipient.
+- Unique submission keys + payload hashes prevent duplicate reports on double
+  clicks and unchanged retries. A changed report is a new submission. Keys and
+  receipt capabilities persist in the browser; report data and emails do not.
+- Multiple SKK recipients and optional judge copy. All get the same saved PDF.
+  Recipient list is snapshotted per report; later changes affect future reports.
+- R2 private PDF storage; protected judge receipt and saved-PDF endpoints.
+- Immediate background delivery and a five-minute scheduled outbox sweep.
+  Atomic leases, exponential retry, stable Resend idempotency keys and event logs.
+  Eight attempts maximum; attempts beyond the safe provider window are held as
+  `uncertain` for operator review. No blind retries after acceptance or bounce.
+- Signed, replay-safe Resend webhooks track delivery, bounce, complaint and failure.
+- Cloudflare Access JWT validation (signature, issuer, audience, expiration),
+  private manager/analyst allowlists, server-side roles and mutation origin checks.
+- Manager-only recipient add/edit/disable, delivery monitor and audit history.
+- Authenticated central statistics and exports; no public statistics API or
+  recipient/email list. Free-text statistical notes need review before sharing.
 
-1. In the repository folder, create a D1 database (`npx wrangler d1 create bsi-reports`).
-   Insert its ID in wrangler.toml; apply schema.sql using
-   `npx wrangler d1 execute bsi-reports --remote --file=schema.sql`.
-2. Create a Turnstile widget allowing callevys-create.github.io. Set secrets using
-   `npx wrangler secret put TURNSTILE_SECRET` and
-   `npx wrangler secret put RESEND_API_KEY`. Use a sending-only Resend key.
-3. Set MAIL_FROM to the verified sender, review the rate limit, and deploy using
-   `npx wrangler deploy`. The endpoint is https://YOUR-WORKER.workers.dev/reports.
-4. Before enabling collection, publish privacy information identifying the report
-   operator, Cloudflare/Resend processing, contact, purpose and retention schedule.
-   Configure access controls and deletion for D1 reports; this prototype does not
-   include a committee dashboard or automatic retention job. Email is passed to
-   Resend only on opt-in, never stored in D1. Resend may retain recipient/log data.
-5. Update public config.js with endpoint, site key and privacy URL, then publish
-   these static files on the existing GitHub Pages branch.
-6. With a test report and an address you control, test unchecked/checked consent,
-   missing/invalid email, expired verification, duplicate clicks, service failure,
-   D1 persistence, email contents, and actual inbox delivery. Confirm all breed
-   choices and risk totals and test on mobile.
+## Activate services
 
-Backend validates counts and breed risk rows, verifies Turnstile on the server,
-restricts origin, bounds request size and rate limits. Reports are stored before
-sending a plain-text copy of the complete report through Resend. No recipient,
-subject or sender supplied by the client can override the fixed mail template.
-Provider acceptance is not confirmed inbox delivery. Email failure leaves the
-report stored and the UI explains how to save a copy. A lost response can leave
-submission uncertain: export first, avoid blindly resubmitting. No automatic
-retries or claim of exactly-once submission are provided.
+Use organisation-owned Cloudflare and Resend accounts. No real collection or
+email sending is enabled by this repository alone. No private addresses, live
+secrets or personal report data should be committed here.
 
-## Verification
+1. Install Node 24 and pnpm; run `pnpm install --frozen-lockfile`, `pnpm build`,
+   `pnpm test`, and `pnpm exec wrangler deploy --dry-run`.
+2. Create D1 (`pnpm exec wrangler d1 create bsi-reports`), set its ID in
+   wrangler.toml and apply the additive schema:
+   `pnpm exec wrangler d1 execute bsi-reports --remote --file=schema.sql`.
+   Existing legacy `reports` records are preserved, but are not automatically
+   relabelled or included in new statistics. Review and migrate historical data
+   separately, with an explicit legacy version, before claiming complete coverage.
+3. Create private R2 bucket `bsi-report-pdfs`. Do not enable a public R2 URL.
+4. Configure a Turnstile widget for `callevys-create.github.io`. Store the secret
+   with `pnpm exec wrangler secret put TURNSTILE_SECRET`.
+5. Verify an organisation-controlled sending domain in Resend and set MAIL_FROM.
+   Store a sending-only key using `pnpm exec wrangler secret put RESEND_API_KEY`.
+6. Use an organisation-controlled backend hostname. Configure Cloudflare Access
+   for `/admin*` and `/api/admin/*`, with named users and appropriate identity/MFA
+   policies. Keep `/reports`, `/receipts/*` and `/webhooks/resend` publicly reachable;
+   their own validations still apply. Set ACCESS_TEAM_DOMAIN and ACCESS_AUD.
+   Do not protect the whole backend, which would block public judge submission.
+7. Set private comma-separated allowlists with `wrangler secret put MANAGER_EMAILS`
+   and `wrangler secret put ANALYST_EMAILS`. Analysts cannot manage recipients or
+   inspect recipient delivery records. The backend never trusts an email header
+   without a cryptographically verified Access token.
+8. Deploy using `pnpm exec wrangler deploy`. Open the protected backend `/admin`
+   page as a manager and add the approved SKK recipient addresses.
+9. Configure Resend webhook URL `/webhooks/resend` for email.delivered,
+   email.bounced, email.complained and email.failed. Set the signing secret using
+   `pnpm exec wrangler secret put RESEND_WEBHOOK_SECRET`.
+10. Publish privacy information (controller, processors, purpose, access, contact,
+    retention, deletion), decide retention and backup/restore responsibilities,
+    then set the public endpoint, Turnstile site key and privacy URL in config.js.
+    Publish that file on GitHub Pages. Never put secrets in it.
+11. Run a controlled live test: submit one report twice, verify one D1 report,
+    correct recipient jobs, identical attached PDFs, saved-PDF download, actual
+    inbox delivery, webhook status, failure recovery and role restrictions.
 
-Run `node --test worker.test.mjs` (Node 22+). Tests use mocked providers;
-passing tests do not constitute a live email delivery test.
+## Statistical definitions and limits
 
-References: https://resend.com/docs/api-reference/emails/send-email
-and https://developers.cloudflare.com/turnstile/get-started/server-side-validation/
+Concern % = (mild + clear + severe) / (none + mild + clear + severe) x 100.
+Zero assessed denominator is **Not available**. Not assessed is excluded and
+reported separately. Dogs judged means judging observations, not unique dogs.
+Counts across risk areas, grading and placing can overlap and must not be summed
+as unique affected dogs. No across-area “dogs with any concern” figure is invented.
+
+Reports retain BSI version and exact risk text. Comparisons occur within the same
+breed, risk and version, and only across consecutive observed years. Differences
+are descriptive percentage-point changes and relative percentage changes; no
+statistical significance or population-level health inference is claimed.
+Partial-year date ranges are respected literally; compare like periods when
+interpreting trends. Show identity currently uses normalised name + date +
+country; a formal SKK show identifier remains a future data-quality improvement.
+
+Statistics reads all matching records in pages, up to 10,000 reports per selection.
+Larger selections explicitly require narrower dates/breed rather than truncating
+results. For national multi-year scale, replace this bounded initial aggregation
+with SQL aggregates and background export jobs before exceeding that limit.
+
+Delivery monitor shows the latest 200 jobs. Automatic retention, a correction/
+withdrawal workflow, public statistical release/redaction and a full operations
+alerting dashboard are not implemented. Managers must investigate permanent and
+uncertain deliveries in the provider dashboard; there is deliberately no unsafe
+one-click re-send. Receipt keys act as confidential bearer capabilities.
+
+## Tests
+
+`pnpm test` uses real in-memory SQLite with the production schema, synthetic
+reports, genuine PDF/XLSX generation, mocked mail/Turnstile/JWKS services and
+signed JWT/webhook fixtures. It covers 38 breeds, validation, transactions,
+duplicate handling, recipient copies, retries/leases, receipts, date ranges,
+denominators, version boundaries, roles, CSRF and webhook replay.
+
+Tests and browser demo exports do not prove live Cloudflare deployment or inbox
+delivery. Test fixtures stay in ignored `.test-output/` and are never published.
+
+## Third-party code and font
+
+PDF generation: pdf-lib and fontkit. Excel packaging: fflate (OOXML text cells,
+no formulas from user input). Authentication: jose. Webhook verification: svix.
+Noto Sans font is distributed under the included FONT-LICENSE.txt.
+Build dependencies are pinned in package.json and pnpm-lock.yaml.
+
+References:
+- https://developers.cloudflare.com/d1/worker-api/d1-database/
+- https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
+- https://resend.com/docs/api-reference/emails/send-email
+- https://resend.com/docs/webhooks/introduction

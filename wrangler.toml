@@ -1,18 +1,34 @@
 name = "bsi-report-service"
 main = "worker.mjs"
 compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "."
+binding = "ASSETS"
+run_worker_first = true
 
 [vars]
 ALLOWED_ORIGIN = "https://callevys-create.github.io"
 ALLOWED_HOSTNAME = "callevys-create.github.io"
 MAIL_FROM = "BSI Reports <reports@YOUR-VERIFIED-DOMAIN>"
+ACCESS_TEAM_DOMAIN = "YOUR-TEAM.cloudflareaccess.com"
+ACCESS_AUD = "REPLACE-WITH-ACCESS-APPLICATION-AUDIENCE"
+# MANAGER_EMAILS and ANALYST_EMAILS must be set privately with wrangler secret put.
 
 [[d1_databases]]
 binding = "DB"
 database_name = "bsi-reports"
 database_id = "REPLACE-WITH-D1-DATABASE-ID"
 
+[[r2_buckets]]
+binding = "PDFS"
+bucket_name = "bsi-report-pdfs"
+
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 5, period = 60 }
+
+[triggers]
+crons = ["*/5 * * * *"]
