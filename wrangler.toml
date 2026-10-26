@@ -1,0 +1,18 @@
+name = "bsi-report-service"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://callevys-create.github.io"
+ALLOWED_HOSTNAME = "callevys-create.github.io"
+MAIL_FROM = "BSI Reports <reports@YOUR-VERIFIED-DOMAIN>"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bsi-reports"
+database_id = "REPLACE-WITH-D1-DATABASE-ID"
+
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 5, period = 60 }
